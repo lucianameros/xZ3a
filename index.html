@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Video Player</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      background: #000;
+      overflow: hidden;
+    }
+
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .video-container {
+      position: relative;
+      width: 100vw;
+      height: 100vh;
+      background: #000;
+      overflow: hidden;
+    }
+
+    #main-video {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: block;
+      background: #000;
+    }
+
+    #play-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.52);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      z-index: 10;
+      transition: background 0.2s;
+      user-select: none;
+    }
+    #play-overlay:hover { background: rgba(0,0,0,0.38); }
+    #play-overlay.hidden { display: none; }
+
+    .play-circle {
+      width: 90px;
+      height: 90px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.15);
+      border: 2.5px solid rgba(255,255,255,0.85);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.15s, background 0.2s;
+    }
+    #play-overlay:hover .play-circle {
+      transform: scale(1.1);
+      background: rgba(255,255,255,0.26);
+    }
+    .triangle {
+      width: 0; height: 0;
+      border-top: 22px solid transparent;
+      border-bottom: 22px solid transparent;
+      border-left: 38px solid #fff;
+      margin-left: 8px;
+    }
+    .play-label {
+      margin-top: 20px;
+      font-size: 15px;
+      color: rgba(255,255,255,0.82);
+      letter-spacing: 0.05em;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+
+    #ads-overlay {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.88);
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 20;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    }
+    #ads-overlay.show { display: flex; }
+
+    .ads-card {
+      background: #161b22;
+      border: 1px solid #30363d;
+      border-radius: 14px;
+      padding: 36px 40px;
+      text-align: center;
+      max-width: 380px;
+      width: 90%;
+      animation: popIn 0.22s ease;
+    }
+    @keyframes popIn {
+      from { transform: scale(0.9); opacity: 0; }
+      to   { transform: scale(1);   opacity: 1; }
+    }
+
+    .ads-icon { font-size: 40px; margin-bottom: 14px; }
+    .ads-card h3 { font-size: 17px; font-weight: 600; color: #e6edf3; margin-bottom: 10px; }
+    .ads-card p { font-size: 13px; color: #8b949e; line-height: 1.65; margin-bottom: 24px; }
+
+    .btn-sponsor {
+      padding: 12px 32px;
+      background: #1f6feb;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 600;
+      border-radius: 8px;
+      border: none;
+      cursor: pointer;
+      transition: background 0.2s, transform 0.1s;
+    }
+    .btn-sponsor:hover { background: #388bfd; transform: translateY(-1px); }
+    .btn-sponsor:active { transform: scale(0.97); }
+
+    .countdown-text { margin-top: 16px; font-size: 12px; color: #6e7681; }
+    .countdown-text span { color: #58a6ff; font-weight: 600; }
+
+    .progress-wrap {
+      width: 100%; height: 3px;
+      background: #21262d;
+      border-radius: 99px;
+      margin-top: 14px;
+      overflow: hidden;
+    }
+    .progress-fill { height: 100%; width: 100%; background: #1f6feb; border-radius: 99px; }
+  </style>
+</head>
+<body>
+
+<div class="video-container">
+
+  <video
+    id="main-video"
+    src="https://cdn.slicedrv.com/PuxZ3aAa1.mp4"
+    controls
+    controlsList="nodownload"
+    preload="metadata"
+    playsinline
+  ></video>
+
+  <div id="play-overlay" onclick="startPlayer()">
+    <div class="play-circle">
+      <div class="triangle"></div>
+    </div>
+    <span class="play-label">Play Video</span>
+  </div>
+
+  <div id="ads-overlay">
+    <div class="ads-card">
+      <div class="ads-icon">⚡</div>
+      <h3>Wait a minute, please...</h3>
+      <p>The video will resume automatically after you click "Continue Watching." This happens only once.</p>
+      <button class="btn-sponsor" onclick="goToAds()">Continue Watching →</button>
+      <div class="countdown-text">
+        You will leave this video in <span id="countdown">5</span> second
+      </div>
+      <div class="progress-wrap">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  // ✏️ GANTI SESUAI KEBUTUHAN
+  var VIDEO_URL    = 'https://cdn.slicedrv.com/PuxZ3aAa1.mp4';
+  var ADS_URL      = 'https://t.co/xA23emSXaU';
+  var ADS_DELAY    = 3000;
+  var SKIP_SECONDS = 5;
+
+  var video    = document.getElementById('main-video');
+  var adsShown = false;
+  var countdownInterval = null;
+
+  // Otomatis sesuaikan ukuran video dengan resolusi aslinya
+  function resizeVideo() {
+    var vw = video.videoWidth;
+    var vh = video.videoHeight;
+    if (!vw || !vh) return;
+    var scale = Math.min(window.innerWidth / vw, window.innerHeight / vh);
+    video.style.width  = (vw * scale) + 'px';
+    video.style.height = (vh * scale) + 'px';
+  }
+
+  video.addEventListener('loadedmetadata', resizeVideo);
+  window.addEventListener('resize', resizeVideo);
+
+  function startPlayer() {
+    document.getElementById('play-overlay').classList.add('hidden');
+    video.play();
+    if (!adsShown) setTimeout(showAds, ADS_DELAY);
+  }
+
+  function showAds() {
+    if (adsShown) return;
+    adsShown = true;
+    video.pause();
+    document.getElementById('ads-overlay').classList.add('show');
+
+    var fill = document.getElementById('progress-fill');
+    fill.style.transition = 'none';
+    fill.style.width = '100%';
+    setTimeout(function () {
+      fill.style.transition = 'width ' + SKIP_SECONDS + 's linear';
+      fill.style.width = '0%';
+    }, 50);
+
+    var left = SKIP_SECONDS;
+    document.getElementById('countdown').textContent = left;
+    countdownInterval = setInterval(function () {
+      left--;
+      var el = document.getElementById('countdown');
+      if (el) el.textContent = left;
+      if (left <= 0) { clearInterval(countdownInterval); resumeVideo(); }
+    }, 1000);
+  }
+
+  function goToAds() {
+    window.open(ADS_URL, '_blank');
+    clearInterval(countdownInterval);
+    setTimeout(resumeVideo, 1200);
+  }
+
+  function resumeVideo() {
+    document.getElementById('ads-overlay').classList.remove('show');
+    video.play();
+  }
+
+  video.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+</script>
+
+</body>
+<!-- Histats.com  START  (aync)-->
+<script type="text/javascript">var _Hasync= _Hasync|| [];
+_Hasync.push(['Histats.start', '1,4586115,4,0,0,0,00010000']);
+_Hasync.push(['Histats.fasi', '1']);
+_Hasync.push(['Histats.track_hits', '']);
+(function() {
+var hs = document.createElement('script'); hs.type = 'text/javascript'; hs.async = true;
+hs.src = ('//s10.histats.com/js15_as.js');
+(document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(hs);
+})();</script>
+<noscript><a href="/" target="_blank"><img  src="//sstatic1.histats.com/0.gif?4586115&101" alt="" border="0"></a></noscript>
+<!-- Histats.com  END  -->
+
+</html>
